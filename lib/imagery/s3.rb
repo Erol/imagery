@@ -81,9 +81,9 @@ class Imagery
         Gateway.store(s3_key(file),
           File.open(root(ext(file))),
           self.class.s3_bucket,
-          :access => :public_read,
+          :acl => :public_read,
           :content_type => "image/jpeg",
-          "Cache-Control" => "max-age=315360000"
+          :cache_control => "max-age=315360000"
         )
       end
     end
@@ -92,24 +92,19 @@ class Imagery
     # serves as an auto-connect module.
     module Gateway
       def self.store(*args)
-        execute(:store, *args)
+        options = args.pop if args.last.is_a?(Hash)
+
+        bucket = AWS::S3.new.buckets[args[2]]
+        object = bucket.objects[args[0]]
+
+        object.write args[1], options
       end
 
       def self.delete(*args)
-        execute(:delete, *args)
-      end
+        bucket = AWS::S3.new.buckets[args[2]]
+        object = bucket[args[0]]
 
-    private
-      def self.execute(command, *args)
-        begin
-          AWS::S3::S3Object.__send__(command, *args)
-        rescue AWS::S3::NoConnectionEstablished
-          AWS::S3::Base.establish_connection!(
-            :access_key_id     => ENV["AMAZON_ACCESS_KEY_ID"],
-            :secret_access_key => ENV["AMAZON_SECRET_ACCESS_KEY"]
-          )
-          retry
-        end
+        object.write args[1]
       end
     end
   end
